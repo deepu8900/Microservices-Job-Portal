@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>JobPortal - Candidate Dashboard</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div class="navbar">
+    <div class="brand">JobPortal</div>
+    <div class="nav-actions">
+        <span id="welcomeText"></span>
+        <button class="secondary" onclick="logout()">Log out</button>
+    </div>
+</div>
+
+<div class="container">
+    <div class="tabs">
+        <button id="tabJobs" class="active">Browse jobs</button>
+        <button id="tabApplications">My applications</button>
+        <button id="tabNotifications">Notifications <span id="notifDot" style="display:none"><span class="notification-dot"></span></span></button>
+    </div>
+
+    <div id="jobsPanel">
+        <div class="search-row">
+            <input type="text" id="searchKeyword" placeholder="Job title..." />
+            <input type="text" id="searchLocation" placeholder="Location..." />
+            <button onclick="searchJobs()">Search</button>
+        </div>
+        <div id="jobsList"></div>
+    </div>
+
+    <div id="applicationsPanel" style="display:none">
+        <div id="applicationsList"></div>
+    </div>
+
+    <div id="notificationsPanel" style="display:none">
+        <div id="notificationsList"></div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="applyModal">
+    <div class="modal">
+        <h3 id="applyJobTitle"></h3>
+        <p style="color:var(--muted); margin-top:8px;">Submit your application for this role.</p>
+        <div class="modal-actions">
+            <button class="secondary" onclick="closeApplyModal()">Cancel</button>
+            <button onclick="confirmApply()">Apply now</button>
+        </div>
+    </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+    const user = requireAuth("CANDIDATE");
+    document.getElementById("welcomeText").textContent = `Hi, ${user.fullName}`;
+
+    let selectedJob = null;
+    let myApplications = [];
+
+    function switchTab(tab) {
+        document.getElementById("jobsPanel").style.display = tab === "jobs" ? "block" : "none";
+        document.getElementById("applicationsPanel").style.display = tab === "applications" ? "block" : "none";
+        document.getElementById("notificationsPanel").style.display = tab === "notifications" ? "block" : "none";
+
+        document.getElementById("tabJobs").classList.toggle("active", tab === "jobs");
+        document.getElementById("tabApplications").classList.toggle("active", tab === "applications");
+        document.getElementById("tabNotifications").classList.toggle("active", tab === "notifications");
+
+        if (tab === "applications") loadApplications();
+        if (tab === "notifications") loadNotifications();
+    }
+
+    document.getElementById("tabJobs").addEventListener("click", () => switchTab("jobs"));
+    document.getElementById("tabApplications").addEventListener("click", () => switchTab("applications"));
+    document.getElementById("tabNotifications").addEventListener("click", () => switchTab("notifications"));
+
+    async function loadJobs(keyword, location) {
+        const jobsList = document.getElementById("jobsList");
+        jobsList.innerHTML = "<p class='empty-state'>Loading jobs...</p>";
+
+        try {
+            const params = new URLSearchParams();
+            if (keyword) params.append("keyword", keyword);
+            if (location) params.append("location", location);
+
+            const jobs = await apiRequest(`/jobs/search?${params.toString()}`);
+
+            if (jobs.length === 0) {
+                jobsList.innerHTML = "<p class='empty-state'>No jobs found. Try a different search.</p>";
+                return;
+            }
+
+            jobsList.innerHTML = jobs.map(job => `
+                <div class="card">
+                    <h3>${job.title}</h3>
+                    <div class="meta">${job.company} • ${job.location || "Location not specified"} ${job.salary ? "• $" + job.salary : ""}</div>
+                    <p>${job.description || ""}</p>
+                    <div class="modal-actions" style="justify-content:flex-start; margin-top:16px;">
+                        <button onclick='openApplyModal(${job.id}, ${JSON.stringify(job.title)})'>Apply</button>
+                    </div>
+                </div>
+            `).join("");
+        } catch (err) {
+            jobsList.innerHTML = `<p class='empty-state'>${err.message}</p>`;
+        }
+    }
+
+    function searchJobs() {
+        const keyword = document.getElementById("searchKeyword").value;
+        const location = document.getElementById("searchLocation").value;
+        loadJobs(keyword, location);
+    }
+
+    function openApplyModal(jobId, title) {
+        selectedJob = jobId;
+        document.getElementById("applyJobTitle").textContent = `Apply to ${title}`;
+        document.getElementById("applyModal").classList.add("open");
+    }
+
+    function closeApplyModal() {
+        document.getElementById("applyModal").classList.remove("open");
+        selectedJob = null;
+    }
+
+    async function confirmApply() {
+        try {
+            await apiRequest("/applications", {
+                method: "POST",
+                body: JSON.stringify({
+                    jobId: selectedJob,
+                    candidateId: user.userId,
+                    candidateName: user.fullName,
+                    candidateEmail: user.email
+                })
+            });
+            closeApplyModal();
+            switchTab("applications");
+        } catch (err) {
+            alert(err.message);
+        }
+    }
+
+    async function loadApplications() {
+        const list = document.getElementById("applicationsList");
+        list.innerHTML = "<p class='empty-state'>Loading applications...</p>";
+
+        try {
+            const applications = await apiRequest(`/applications/candidate/${user.userId}`);
+            if (applications.length === 0) {
+                list.innerHTML = "<p class='empty-state'>You haven't applied to any jobs yet.</p>";
+                return;
+            }
+
+            list.innerHTML = applications.map(app => `
+                <div class="card">
+                    <h3>Job #${app.jobId}</h3>
+                    <div class="meta">Applied on ${new Date(app.appliedAt).toLocaleDateString()}</div>
+                    <span class="badge ${app.status === 'HIRED' ? 'success' : app.status === 'REJECTED' ? 'danger' : ''}">${app.status}</span>
+                </div>
+            `).join("");
+        } catch (err) {
+            list.innerHTML = `<p class='empty-state'>${err.message}</p>`;
+        }
+    }
+
+    async function loadNotifications() {
+        const list = document.getElementById("notificationsList");
+        list.innerHTML = "<p class='empty-state'>Loading notifications...</p>";
+
+        try {
+            const notifications = await apiRequest(`/notifications/${user.userId}`);
+            if (notifications.length === 0) {
+                list.innerHTML = "<p class='empty-state'>No notifications yet.</p>";
+                return;
+            }
+
+            list.innerHTML = notifications.map(n => `
+                <div class="card">
+                    <p>${n.message}</p>
+                    <div class="meta">${new Date(n.createdAt).toLocaleString()}</div>
+                </div>
+            `).join("");
+        } catch (err) {
+            list.innerHTML = `<p class='empty-state'>${err.message}</p>`;
+        }
+    }
+
+    loadJobs();
+</script>
+
+</body>
+</html>

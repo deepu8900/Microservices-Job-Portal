@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>JobPortal - Login</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div class="navbar">
+    <div class="brand">JobPortal</div>
+</div>
+
+<div class="auth-card">
+    <h2>Welcome back</h2>
+    <form id="loginForm">
+        <label for="email">Email</label>
+        <input type="email" id="email" required />
+
+        <label for="password">Password</label>
+        <input type="password" id="password" required />
+
+        <button type="submit" class="btn-block">Log in</button>
+        <p class="error-message" id="errorMessage"></p>
+    </form>
+    <p class="link-row">Don't have an account? <a href="register.html">Create one</a></p>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+    document.getElementById("loginForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const errorEl = document.getElementById("errorMessage");
+        errorEl.style.display = "none";
+
+        const email = document.getElementById("email").value;
+        const password = document.getElementById("password").value;
+
+        try {
+            const response = await apiRequest("/auth/login", {
+                method: "POST",
+                body: JSON.stringify({ email, password })
+            });
+
+            setSession(response);
+
+            if (response.role === "RECRUITER") {
+                window.location.href = "dashboard-recruiter.html";
+            } else if (response.role === "ADMIN") {
+                window.location.href = "dashboard-admin.html";
+            } else {
+                window.location.href = "dashboard-candidate.html";
+            }
+        } catch (err) {
+            errorEl.textContent = err.message;
+            errorEl.style.display = "block";
+        }
+    });
+</script>
+
+</body>
+</html>

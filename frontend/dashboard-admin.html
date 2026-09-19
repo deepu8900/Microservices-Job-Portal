@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>JobPortal - Admin Dashboard</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div class="navbar">
+    <div class="brand">JobPortal</div>
+    <div class="nav-actions">
+        <span id="welcomeText"></span>
+        <button class="secondary" onclick="logout()">Log out</button>
+    </div>
+</div>
+
+<div class="container">
+    <div class="section-title">Platform overview</div>
+    <div class="card">
+        <h3 id="totalJobs">--</h3>
+        <div class="meta">Total job postings</div>
+    </div>
+
+    <div class="section-title" style="margin-top:32px;">All jobs</div>
+    <div id="jobsList"></div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+    const user = requireAuth("ADMIN");
+    document.getElementById("welcomeText").textContent = `Hi, ${user.fullName}`;
+
+    async function loadOverview() {
+        const list = document.getElementById("jobsList");
+        list.innerHTML = "<p class='empty-state'>Loading...</p>";
+
+        try {
+            const jobs = await apiRequest("/jobs/search");
+            document.getElementById("totalJobs").textContent = jobs.length;
+
+            if (jobs.length === 0) {
+                list.innerHTML = "<p class='empty-state'>No jobs on the platform yet.</p>";
+                return;
+            }
+
+            list.innerHTML = jobs.map(job => `
+                <div class="card">
+                    <h3>${job.title}</h3>
+                    <div class="meta">${job.company} • ${job.location || "Remote"} • <span class="badge">${job.status}</span></div>
+                </div>
+            `).join("");
+        } catch (err) {
+            list.innerHTML = `<p class='empty-state'>${err.message}</p>`;
+        }
+    }
+
+    loadOverview();
+</script>
+
+</body>
+</html>

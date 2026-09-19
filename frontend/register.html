@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>JobPortal - Register</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div class="navbar">
+    <div class="brand">JobPortal</div>
+</div>
+
+<div class="auth-card">
+    <h2>Create your account</h2>
+    <form id="registerForm">
+        <label for="fullName">Full name</label>
+        <input type="text" id="fullName" required />
+
+        <label for="email">Email</label>
+        <input type="email" id="email" required />
+
+        <label for="password">Password</label>
+        <input type="password" id="password" required minlength="6" />
+
+        <label for="role">I am a</label>
+        <select id="role">
+            <option value="CANDIDATE">Candidate looking for jobs</option>
+            <option value="RECRUITER">Recruiter posting jobs</option>
+        </select>
+
+        <button type="submit" class="btn-block">Sign up</button>
+        <p class="error-message" id="errorMessage"></p>
+    </form>
+    <p class="link-row">Already have an account? <a href="index.html">Log in</a></p>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+    document.getElementById("registerForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const errorEl = document.getElementById("errorMessage");
+        errorEl.style.display = "none";
+
+        const fullName = document.getElementById("fullName").value;
+        const email = document.getElementById("email").value;
+        const password = document.getElementById("password").value;
+        const role = document.getElementById("role").value;
+
+        try {
+            const response = await apiRequest("/auth/register", {
+                method: "POST",
+                body: JSON.stringify({ fullName, email, password, role })
+            });
+
+            setSession(response);
+
+            if (response.role === "RECRUITER") {
+                window.location.href = "dashboard-recruiter.html";
+            } else {
+                window.location.href = "dashboard-candidate.html";
+            }
+        } catch (err) {
+            errorEl.textContent = err.message;
+            errorEl.style.display = "block";
+        }
+    });
+</script>
+
+</body>
+</html>
